@@ -30,7 +30,8 @@ export function isTrustedMessage(event, popup, origin, state) {
 }
 
 export class Auth {
-  constructor(config, deployment, win = window, fetcher = fetch) {
+  // Keep Window.fetch bound to its global receiver when used as an instance transport.
+  constructor(config, deployment, win = window, fetcher = (...args) => globalThis.fetch(...args)) {
     this.config = config;
     this.deployment = deployment;
     this.win = win;

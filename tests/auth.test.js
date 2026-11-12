@@ -9,6 +9,20 @@ const storage = () => {
 };
 const win = () => ({ location: { origin: new URL(DEPLOYMENT.siteUrl).origin }, sessionStorage: storage(), crypto: webcrypto });
 
+test('default token transport preserves the browser fetch receiver', async t => {
+  let calls = 0;
+  t.mock.method(globalThis, 'fetch', async function () {
+    assert.equal(this, globalThis, 'Native Window.fetch requires the global receiver');
+    calls++;
+    return Response.json({ access_token: 'test-only', token_type: 'bearer', expires_in: 3600 });
+  });
+  const auth = new Auth(GENESYS, DEPLOYMENT, win());
+  const tx = await createTransaction(webcrypto, DEPLOYMENT.redirectUri);
+  await auth.exchange(tx, new URLSearchParams({ state: tx.state, code: 'test-code' }));
+  assert.equal(auth.token(), 'test-only');
+  assert.equal(calls, 1);
+});
+
 test('PKCE uses high-entropy random nonces and SHA-256', async () => {
   const first = await createTransaction(webcrypto, DEPLOYMENT.redirectUri);
   const second = await createTransaction(webcrypto, DEPLOYMENT.redirectUri);

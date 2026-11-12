@@ -3,6 +3,7 @@ import { spawn } from 'node:child_process';
 import { mkdir, writeFile, access } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { once } from 'node:events';
+import { createServer } from 'node:http';
 import assert from 'node:assert/strict';
 import { serve } from './serve.mjs';
 import { GENESYS, QUEUE_PROFILES } from '../config.js';
@@ -16,6 +17,31 @@ if (!executable) throw new Error('Set CHROME_PATH to an installed Chromium brows
 const server = serve(0);
 await once(server, 'listening');
 const base = `http://127.0.0.1:${server.address().port}/Genesys_Cloud-Custom-Queue-Activation/`;
+const nativeCalls = [];
+const fakeUser = { id: '11111111-2222-4333-8444-555555555555', name: 'Browser Test Agent' };
+// Local HTTP responses exercise the browser's native fetch, including its Window receiver and CORS.
+const nativeServer = createServer((req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', new URL(base).origin);
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'authorization, content-type');
+  if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
+  const url = new URL(req.url, 'http://localhost');
+  nativeCalls.push({ method: req.method, path: url.pathname, joined: url.searchParams.get('joined') });
+  res.setHeader('Content-Type', 'application/json');
+  if (req.method === 'POST' && url.pathname === '/oauth/token') {
+    res.end(JSON.stringify({ access_token: 'native-browser-only', token_type: 'bearer', expires_in: 3600 }));
+  } else if (req.headers.authorization !== 'Bearer native-browser-only') {
+    res.writeHead(401); res.end('{}');
+  } else if (req.method === 'GET' && url.pathname === '/api/v2/users/me') {
+    res.end(JSON.stringify(fakeUser));
+  } else if (req.method === 'GET' && url.pathname === `/api/v2/users/${fakeUser.id}/queues`) {
+    const joined = url.searchParams.get('joined') === 'true';
+    const entities = Object.entries(QUEUE_PROFILES).flatMap(([name, queues]) => queues.map(q => ({ ...q, joined: name === 'Eparchia' }))).filter(q => q.joined === joined);
+    res.end(JSON.stringify({ entities, total: entities.length, pageNumber: 1, pageCount: 1 }));
+  } else { res.writeHead(404); res.end('{}'); }
+}).listen(0, '127.0.0.1');
+await once(nativeServer, 'listening');
+const nativeOrigin = `http://127.0.0.1:${nativeServer.address().port}`;
 const chrome = spawn(executable, ['--headless=new', '--disable-gpu', '--disable-background-networking', '--no-first-run', '--no-default-browser-check', '--remote-debugging-port=0', `--user-data-dir=${join(qa, `browser-${process.pid}`)}`, 'about:blank'], { windowsHide: true, stdio: ['ignore', 'ignore', 'pipe'] });
 let socket;
 try {
@@ -83,9 +109,37 @@ try {
   assert.equal(await evaluate(`document.documentElement.scrollWidth <= innerWidth`), true, 'Mobile must not overflow horizontally');
   await screenshot('demo-mobile.png');
 
+  // Only this local network fixture needs a CSP bypass. Production CSP remains unchanged.
+  await send('Page.setBypassCSP', { enabled: true });
+  // Chrome applies this override when a new document initializes its CSP.
+  await send('Page.navigate', { url: `${base}?demo=1` });
+  await waitFor(`document.querySelector('#current-profile')?.textContent === 'Eparchia' && !document.querySelector('[data-profile]').disabled`);
+  try {
+    const result = await evaluate(`(async () => {
+      const { Auth, createTransaction } = await import('./auth.js');
+      const { GenesysApi } = await import('./genesys-api.js');
+      const config = { clientId: 'native-browser-test', scopes: [], loginUrl: '${nativeOrigin}', apiUrl: '${nativeOrigin}' };
+      const deployment = { redirectUri: new URL('oauth/callback.html', location.href).href };
+      const auth = new Auth(config, deployment);
+      try {
+        const tx = await createTransaction(crypto, deployment.redirectUri);
+        await auth.exchange(tx, new URLSearchParams({ state: tx.state, code: 'mock-code' }));
+        const api = new GenesysApi(config, () => auth.token());
+        const user = await api.getMe();
+        const queues = await api.getQueues();
+        return { signedIn: auth.hasSession(), user, total: queues.length, active: queues.filter(q => q.joined).length };
+      } finally { auth.logout(); }
+    })()`);
+    assert.deepEqual(result, { signedIn: true, user: fakeUser, total: 9, active: 3 });
+    assert.deepEqual(nativeCalls, [
+      { method: 'POST', path: '/oauth/token', joined: null },
+      { method: 'GET', path: '/api/v2/users/me', joined: null },
+      ...['true', 'false'].map(joined => ({ method: 'GET', path: `/api/v2/users/${fakeUser.id}/queues`, joined })),
+    ]);
+  } finally { await send('Page.setBypassCSP', { enabled: false }); }
+
   // Exercise the real UI/controller/API connection with fetch mocked before module evaluation.
   const mockQueues = Object.entries(QUEUE_PROFILES).flatMap(([name, queues]) => queues.map(q => ({ ...q, joined: name === 'Eparchia' })));
-  const fakeUser = { id: '11111111-2222-4333-8444-555555555555', name: 'Browser Test Agent' };
   await send('Page.addScriptToEvaluateOnNewDocument', { source: `
     sessionStorage.setItem('queue-profiles.session.v1:${GENESYS.clientId}', JSON.stringify({ accessToken: 'mock-browser-only', expiresAt: Date.now() + 3600000 }));
     window.mockQueues = ${JSON.stringify(mockQueues)};
@@ -124,8 +178,8 @@ try {
   assert.equal(await evaluate(`sessionStorage.getItem('queue-profiles.session.v1:${GENESYS.clientId}')`), null);
   assert.deepEqual(errors, [], 'No browser runtime errors');
   assert.deepEqual(liveRequests, [], 'QA must not attempt live Genesys requests');
-  console.log('Browser QA passed: login, Greek/English, demo switches, duplicate click, themes, 375px mobile, mocked API switch, no-op, missing membership, 403 reconciliation, sign-out, subdirectory assets. No live Genesys requests.');
+  console.log('Browser QA passed: native-fetch OAuth exchange and API reads, login, Greek/English, demo switches, duplicate click, themes, 375px mobile, mocked API switch, no-op, missing membership, 403 reconciliation, sign-out, subdirectory assets. No live Genesys requests.');
   console.log(`Screenshots: ${qa}`);
 } finally {
-  socket?.close(); chrome.kill(); server.close();
+  socket?.close(); chrome.kill(); server.close(); nativeServer.close();
 }

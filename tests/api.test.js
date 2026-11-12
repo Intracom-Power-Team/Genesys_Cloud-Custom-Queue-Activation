@@ -5,6 +5,19 @@ import { GENESYS, QUEUE_PROFILES } from '../config.js';
 const user = { id: '11111111-2222-4333-8444-555555555555', name: 'Test Agent' };
 const queues = Object.entries(QUEUE_PROFILES).flatMap(([name, list]) => list.map(q => ({ ...q, joined: name === 'Eparchia' })));
 const listing = (entities, extra = {}) => ({ entities, pageNumber: 1, pageCount: 1, total: entities.length, ...extra });
+
+test('default API transport preserves the browser fetch receiver', async t => {
+  let calls = 0;
+  t.mock.method(globalThis, 'fetch', async function () {
+    assert.equal(this, globalThis, 'Native Window.fetch requires the global receiver');
+    calls++;
+    return Response.json(user);
+  });
+  const api = new GenesysApi(GENESYS, () => 'mock-token');
+  assert.deepEqual(await api.getMe(), user);
+  assert.equal(calls, 1);
+});
+
 function fixture(handler = () => undefined) {
   const calls = [];
   const fetcher = async (url, options) => {

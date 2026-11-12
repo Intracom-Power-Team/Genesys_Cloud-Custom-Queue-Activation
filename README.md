@@ -91,7 +91,7 @@ Optional real-browser verification, using an installed Chrome/Chromium/Edge:
 node scripts/browser-check.mjs
 ```
 
-Set `CHROME_PATH` if automatic browser detection does not find it. This launches an isolated headless browser, blocks the Genesys hosts, exercises the UI with demo/mocked API data, and saves screenshots in ignored `.qa/`. It never changes live queues. Unit tests cover transitions, no-op switching, custom states, missing memberships, permissions, rate limits, token expiry, partial updates, unrelated queues, bad/duplicate UUIDs, OAuth state, forged messages, popup blocking, session reload, refresh, rapid clicks, subdirectory paths, and pagination.
+Set `CHROME_PATH` if automatic browser detection does not find it. This launches an isolated headless browser, blocks the Genesys hosts, exercises the UI with demo/mocked API data, and saves screenshots in ignored `.qa/`. A local HTTP fixture also verifies OAuth token exchange and API reads using native browser `fetch`, without replacing it with a JavaScript mock. It never changes live queues. Unit tests cover transitions, no-op switching, custom states, missing memberships, permissions, rate limits, token expiry, partial updates, unrelated queues, bad/duplicate UUIDs, OAuth state, forged messages, popup blocking, session reload, refresh, rapid clicks, subdirectory paths, pagination, and the native fetch receiver requirement.
 
 Demo mode requires `?demo=1`, prominently labels all sample data, and only changes in-memory state. Reloading demo resets its sample state. Live failures never trigger demo mode.
 
@@ -130,12 +130,13 @@ First validate the standalone app. Client Applications support full-page and sid
 
 5. Configure **Group Filtering**/application visibility for the appropriate existing official directory groups as offered by that integration. Do not create Eparchia/Athina/Thessaloniki Directory Groups for these logical profiles. The app has no group API calls.
 6. Save the configuration. In **Details**, activate the integration and confirm activation.
-7. Have a permitted agent refresh Genesys Cloud, launch the named app from the Apps/sidebar launcher appropriate to the chosen placement, and click **Sign in**. If it is absent, recheck activation, group filtering, integration type, and license availability.
+7. Have a permitted agent refresh Genesys Cloud, launch the named app from the Apps/sidebar launcher appropriate to the chosen placement, and click **Continue with Genesys Cloud**. If it is absent, recheck activation, group filtering, integration type, and license availability.
 
 Official references: [Client Application placements](https://help.genesys.cloud/?p=131847), [installation and activation](https://help.genesys.cloud/131851/), [documented sandbox options and official-group filtering](https://help.genesys.cloud/articles/set-up-an-interaction-widget-integration/). Menu labels can vary with Genesys navigation and integration type; use the selected tile's actual configuration controls.
 
 ## Authentication and security
 
+- The custom app needs its own delegated authorization even when launched inside Genesys Cloud. Its temporary authorization popup can reuse an existing Genesys login session; the app does not force another password prompt. Any consent or reauthentication requirement is controlled by the organization and its identity provider. A valid app token is reused on reload where session storage is available.
 - Authorization Code + PKCE S256 uses cryptographically random state and verifier values, validates state and transaction age, and uses an exact configured callback URI.
 - Popup authentication keeps the verifier in the opener's memory. The callback strips the code from the address bar and sends only the code/state to the opener with an exact target origin. The opener validates origin, window source, message type, and nonce before exchanging it.
 - Same-tab fallback is permitted only outside an iframe and uses a short-lived transaction in sessionStorage. It is removed before exchange. If opener access or session storage is blocked, sign-in fails safely.

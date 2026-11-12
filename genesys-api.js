@@ -10,7 +10,8 @@ export function retryAfterMs(value, now = Date.now()) {
 export class GenesysApi {
   #userId = null;
   #memberships = null;
-  constructor(config, getToken, { fetcher = fetch, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), now = Date.now } = {}) {
+  // Native Window.fetch rejects calls with a GenesysApi instance as its receiver.
+  constructor(config, getToken, { fetcher = (...args) => globalThis.fetch(...args), sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), now = Date.now } = {}) {
     this.config = config; this.getToken = getToken; this.fetcher = fetcher; this.sleep = sleep; this.now = now;
     this.retryAt = 0;
   }
