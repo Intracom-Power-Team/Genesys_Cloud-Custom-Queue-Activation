@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="el">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src https://api.mypurecloud.de https://login.mypurecloud.de; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="Activate your Genesys Cloud queue profile with one click.">
+  <title>Genesys Cloud — Queue Profile Switcher</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="./" aria-label="Queue Profile Switcher"><span class="brand-icon" aria-hidden="true">g<span>•</span></span><span>GENESYS CLOUD<small data-i18n="workspace">Χώρος εργασίας agent</small></span></a>
+      <div class="preferences">
+        <label class="sr-only" for="language">Language / Γλώσσα</label>
+        <select id="language"><option value="el">Ελληνικά</option><option value="en">English</option></select>
+        <button class="icon-button" id="theme" type="button" aria-label="Αλλαγή θέματος">◐</button>
+      </div>
+    </header>
+    <main>
+      <div id="demo-banner" class="demo-banner" hidden><strong data-i18n="demoLabel">DEMO MODE</strong><span data-i18n="demoNotice">Δοκιμαστικά δεδομένα. Δεν γίνονται κλήσεις στο Genesys Cloud.</span><a href="./" data-i18n="exitDemo">Έξοδος</a></div>
+      <section class="intro">
+        <p class="eyebrow" data-i18n="eyebrow">QUEUE MANAGEMENT</p>
+        <h1>Genesys Cloud <span>— Queue Profile Switcher</span></h1>
+        <p class="intro-copy" data-i18n="intro">Η σωστή ομάδα ουρών. Με ένα κλικ.</p>
+      </section>
+      <section id="login-panel" class="login-panel">
+        <div class="login-symbol" aria-hidden="true">↗</div>
+        <div><h2 data-i18n="loginTitle">Ο χώρος σας, οι ουρές σας</h2><p data-i18n="loginCopy">Συνδεθείτε με τον προσωπικό σας λογαριασμό Genesys Cloud για να δείτε και να αλλάξετε το ενεργό προφίλ σας.</p></div>
+        <div class="login-actions"><button id="signin" class="primary" data-i18n="signin">Σύνδεση στο Genesys Cloud ↗</button><a href="?demo=1" data-i18n="tryDemo">Δοκιμάστε την προεπισκόπηση</a></div>
+        <div class="fallback"><a id="standalone" href="./" target="_blank" rel="noopener noreferrer" data-i18n="standalone">Άνοιγμα σε ξεχωριστή καρτέλα</a><button id="redirect-signin" class="text-button" data-i18n="redirectSignin">Σύνδεση σε αυτή την καρτέλα</button></div>
+      </section>
+      <section id="agent-panel" class="agent-panel" hidden>
+        <div class="avatar" id="avatar" aria-hidden="true">—</div>
+        <div class="agent-info"><span class="eyebrow" data-i18n="signedIn">ΣΥΝΔΕΔΕΜΕΝΟΣ ΧΡΗΣΤΗΣ</span><strong id="agent-name">—</strong></div>
+        <div class="region"><span class="status-dot"></span>EU · Frankfurt</div>
+        <button id="signout" class="text-button" data-i18n="signout">Αποσύνδεση</button>
+      </section>
+      <div id="notice" class="notice" role="status" aria-live="polite" aria-atomic="true"></div>
+      <section class="profiles-section" aria-labelledby="profiles-heading">
+        <div class="section-heading"><div><p class="eyebrow" data-i18n="step">01 / ΕΠΙΛΟΓΗ ΠΡΟΦΙΛ</p><h2 id="profiles-heading" data-i18n="choose">Πού εργάζεστε σήμερα;</h2></div><button id="refresh" class="secondary" disabled data-i18n="refresh">↻ Ανανέωση κατάστασης</button></div>
+        <div class="current-line"><span data-i18n="current">Ενεργό προφίλ</span><strong id="current-profile">—</strong><span id="last-updated"></span></div>
+        <div id="profiles" class="profile-grid"></div>
+      </section>
+      <section class="queue-panel" aria-labelledby="queues-heading">
+        <div class="section-heading"><div><p class="eyebrow" data-i18n="detail">02 / ΚΑΤΑΣΤΑΣΗ ΟΥΡΩΝ</p><h2 id="queues-heading">Eparchia</h2></div><span id="queue-summary" class="small-label">3 queues</span></div>
+        <div id="queue-list" class="queue-list"></div>
+        <p class="queue-footnote" data-i18n="queueFootnote">Η κατάσταση επαληθεύεται από το Genesys Cloud μετά από κάθε αλλαγή.</p>
+      </section>
+      <details id="all-statuses" class="all-statuses"><summary data-i18n="allQueues">Κατάσταση και των 9 διαχειριζόμενων ουρών</summary><div id="all-queue-list" class="queue-list"></div></details>
+      <aside class="scope-note"><span aria-hidden="true">ⓘ</span><p data-i18n="scope">Η επιλογή ενεργοποιεί τις 3 ουρές του προφίλ και απενεργοποιεί τις υπόλοιπες διαχειριζόμενες ουρές. Οι άλλες ουρές σας και η κατάσταση On Queue / Off Queue παραμένουν ως έχουν.</p></aside>
+    </main>
+    <footer><span>INTRACOM POWER TEAM</span><span>Queue Profile Switcher <span class="footer-dot">·</span> v1.0</span></footer>
+  </div>
+  <noscript>Ενεργοποιήστε τη JavaScript για να χρησιμοποιήσετε την εφαρμογή. / Please enable JavaScript.</noscript>
+</body>
+</html>
